@@ -4,7 +4,7 @@ const path = require('path');
 const cors = require('cors');
 
 const app = express();
-const PORT = 3000;
+const PORT = 3001;
 
 // Middleware
 app.use(cors());
@@ -116,5 +116,5 @@ app.get('/api/midi-files', async (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);
-    console.log('Open your browser and navigate to http://localhost:${PORT} to use the Musical Structure Annotation Tool');
+    console.log('Backend server ready. Use npm run dev to start the frontend.');
 });
