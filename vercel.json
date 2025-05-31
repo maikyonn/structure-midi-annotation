@@ -10,7 +10,10 @@
     },
     {
       "src": "server.js",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": "midi/**"
+      }
     }
   ],
   "routes": [
@@ -22,10 +25,5 @@
       "src": "/(.*)",
       "dest": "/dist/$1"
     }
-  ],
-  "functions": {
-    "server.js": {
-      "includeFiles": "midi/**"
-    }
-  }
+  ]
 }
