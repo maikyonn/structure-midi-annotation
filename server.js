@@ -114,7 +114,13 @@ app.get('/api/midi-files', async (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`Server running at http://localhost:${PORT}`);
-    console.log('Backend server ready. Use npm run dev to start the frontend.');
-});
+// For local development
+if (require.main === module) {
+    app.listen(PORT, () => {
+        console.log(`Server running at http://localhost:${PORT}`);
+        console.log('Backend server ready. Use npm run dev to start the frontend.');
+    });
+}
+
+// Export for Vercel serverless functions
+module.exports = app;

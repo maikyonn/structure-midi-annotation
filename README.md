@@ -18,14 +18,21 @@ A web-based tool for verifying and annotating musical structure predictions in M
    npm install
    ```
 
-2. **Start the server**:
+2. **Development mode** (recommended):
    ```bash
-   npm start
+   # Start frontend development server
+   npm run dev
+   
+   # In a separate terminal, start the backend server
+   npm run server:dev
    ```
+   
+   Then open your browser to `http://localhost:5173` (frontend) - the backend runs on `http://localhost:3001`
 
-3. **Open your browser** and navigate to:
-   ```
-   http://localhost:3000
+3. **Production build**:
+   ```bash
+   npm run build
+   npm run preview
    ```
 
 ## Usage
@@ -73,13 +80,13 @@ The `included_files.csv` contains the following columns:
 ## Technical Details
 
 ### Frontend
-- **HTML5/CSS3**: Modern responsive interface
-- **Vanilla JavaScript**: No framework dependencies
+- **Svelte**: Modern reactive frontend framework  
+- **Vite**: Fast build tool and development server
 - **Tone.js**: Web audio synthesis for MIDI playback
 - **Canvas/DOM**: Piano roll visualization
 
 ### Backend
-- **Node.js/Express**: Web server
+- **Node.js/Express**: Web server (can run as serverless function)
 - **File System**: CSV reading/writing
 - **CORS**: Cross-origin resource sharing enabled
 
@@ -90,11 +97,62 @@ The `included_files.csv` contains the following columns:
   - `jsmidgen`
   - `tone/midi`
 
+## Deployment
+
+### Vercel Deployment
+
+This project can be easily deployed to Vercel with both frontend and backend:
+
+1. **Fork/Clone the repository** to your GitHub account
+
+2. **Connect to Vercel**:
+   - Go to [vercel.com](https://vercel.com)
+   - Import your GitHub repository
+   - Vercel will automatically detect it as a Vite project
+
+3. **Environment Setup**:
+   - The frontend will be deployed automatically
+   - The backend (`server.js`) will run as a serverless function
+   - MIDI files and CSV data will be served from the repository
+
+4. **Custom Domain** (optional):
+   - Add your custom domain in Vercel dashboard
+   - Configure DNS settings as instructed
+
+5. **Automatic Deployments**:
+   - Every push to main branch will trigger a new deployment
+   - Preview deployments for pull requests
+
+### Manual Deployment Steps
+
+If you prefer manual deployment:
+
+```bash
+# Install Vercel CLI
+npm i -g vercel
+
+# Deploy from project root
+vercel
+
+# Follow the prompts to configure your deployment
+```
+
+### Alternative Deployment Options
+
+- **Netlify**: Similar process to Vercel
+- **GitHub Pages**: For static frontend only
+- **Heroku**: For full-stack deployment with backend
+- **DigitalOcean App Platform**: Container-based deployment
+
 ## Development
 
 For development with auto-restart:
 ```bash
+# Frontend (Vite dev server)
 npm run dev
+
+# Backend (Express server with nodemon)
+npm run server:dev
 ```
 
 ## Customization
