@@ -12,13 +12,25 @@
       "src": "server.js",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": "midi/**"
+        "includeFiles": ["midi/**", "included_files.csv"]
       }
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
+      "dest": "/server.js"
+    },
+    {
+      "src": "/included_files.csv",
+      "dest": "/server.js"
+    },
+    {
+      "src": "/update-annotation",
+      "dest": "/server.js"
+    },
+    {
+      "src": "/midi/(.*)",
       "dest": "/server.js"
     },
     {

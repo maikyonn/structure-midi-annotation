@@ -101,6 +101,26 @@ function parseCSVLine(line) {
     return result;
 }
 
+// Serve MIDI files
+app.get('/midi/:filename', async (req, res) => {
+    try {
+        const filename = req.params.filename;
+        const midiPath = path.join(__dirname, 'midi', filename);
+        
+        // Check if file exists
+        await fs.access(midiPath);
+        
+        // Read and serve the MIDI file
+        const midiData = await fs.readFile(midiPath);
+        res.setHeader('Content-Type', 'audio/midi');
+        res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+        res.send(midiData);
+    } catch (error) {
+        console.error('Error serving MIDI file:', error);
+        res.status(404).json({ error: 'MIDI file not found' });
+    }
+});
+
 // Get list of available MIDI files
 app.get('/api/midi-files', async (req, res) => {
     try {
