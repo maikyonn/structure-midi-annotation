@@ -15,14 +15,7 @@
     <p>Verify and annotate musical structure predictions for MIDI files</p>
   </div>
   
-  <div class="file-selector">
-    <label for="midiSelect">Select MIDI File:</label>
-    <select id="midiSelect">
-      <option value="">Loading files...</option>
-    </select>
-    <button class="next-btn" id="nextUnannotatedBtn">Next Unannotated</button>
-    <div class="unannotated-count" id="unannotatedCount">Unannotated files: --</div>
-  </div>
+  <!-- Compact control bar with file selection and controls -->
   
   <div class="midi-info" id="midiInfo" style="display: none;">
     <div>
@@ -61,32 +54,71 @@
     </div>
   </div>
   
-  <div class="controls">
-    <div class="control-group">
+  <div class="controls-container">
+    <!-- File Selection Panel -->
+    <div class="control-panel file-panel">
+      <h4>File</h4>
+      <div class="file-controls">
+        <label for="midiSelect">MIDI:</label>
+        <select id="midiSelect">
+          <option value="">Loading files...</option>
+        </select>
+        <button class="next-btn" id="nextUnannotatedBtn">Next</button>
+      </div>
+      <span class="unannotated-count" id="unannotatedCount">--</span>
+    </div>
+    
+    <!-- Audio Controls Panel -->
+    <div class="control-panel audio-panel">
+      <h4>Audio</h4>
+      <div class="volume-control">
+        <span class="volume-label">🔊</span>
+        <input type="range" class="volume-slider" id="volumeSlider" min="0" max="100" value="100">
+        <span class="volume-value" id="volumeValue">100%</span>
+      </div>
+      <div class="speed-controls">
+        <span class="speed-label">Speed:</span>
+        <div class="speed-radio-group">
+          <label class="speed-radio">
+            <input type="radio" name="speed" value="1">
+            <span>1x</span>
+          </label>
+          <label class="speed-radio">
+            <input type="radio" name="speed" value="2" checked>
+            <span>2x</span>
+          </label>
+          <label class="speed-radio">
+            <input type="radio" name="speed" value="3">
+            <span>3x</span>
+          </label>
+          <label class="speed-radio">
+            <input type="radio" name="speed" value="5">
+            <span>5x</span>
+          </label>
+          <label class="speed-radio">
+            <input type="radio" name="speed" value="8">
+            <span>8x</span>
+          </label>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Playback Panel -->
+    <div class="control-panel playback-panel">
+      <h4>Playback</h4>
       <button class="play-btn" id="playBtn">▶ Play</button>
       <div class="progress-bar">
         <div class="progress-fill" id="progressFill"></div>
       </div>
-      <div class="volume-control">
-        <span class="volume-label">🔊 Volume:</span>
-        <input type="range" class="volume-slider" id="volumeSlider" min="0" max="100" value="70">
-        <span class="volume-label" id="volumeValue">70% (10x boost)</span>
-      </div>
-      <div class="speed-control">
-        <span class="speed-label">⚡ Speed:</span>
-        <select id="speedSelect" class="speed-selector">
-          <option value="1">1x</option>
-          <option value="2">2x</option>
-          <option value="3">3x</option>
-          <option value="5">5x</option>
-          <option value="8">8x</option>
-        </select>
-      </div>
-      <small style="color: #666; text-align: center;">Click play to initialize audio</small>
     </div>
-    <div class="control-group">
-      <button class="agree-btn" id="agreeBtn">✓ Agree</button>
-      <button class="disagree-btn" id="disagreeBtn">✗ Disagree</button>
+    
+    <!-- Annotation Panel -->
+    <div class="control-panel annotation-panel">
+      <h4>Annotation</h4>
+      <div class="annotation-controls">
+        <button class="agree-btn" id="agreeBtn">✓ Agree</button>
+        <button class="disagree-btn" id="disagreeBtn">✗ Disagree</button>
+      </div>
     </div>
   </div>
   
@@ -117,26 +149,71 @@
     border-bottom: 2px solid #e0e0e0;
   }
   
-  .file-selector {
-    margin-bottom: 20px;
-    padding: 15px;
+  .controls-container {
+    display: flex;
+    justify-content: center;
+    gap: 25px;
+    margin: 20px 0;
+    padding: 20px;
     background: #f9f9f9;
-    border-radius: 5px;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+    flex-wrap: wrap;
+  }
+  
+  .control-panel {
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: 10px;
+    padding: 15px 20px;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    min-width: 140px;
+  }
+  
+  .control-panel h4 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    color: #666;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .file-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+  }
+  
+  .file-controls label {
+    font-weight: bold;
+    font-size: 12px;
+    margin: 0;
+    color: #666;
+  }
+  
+  .file-controls select {
+    width: 100%;
+    min-width: 150px;
+    text-align: center;
   }
   
   .next-btn {
     background: #FF9800;
     color: white;
-    padding: 10px 16px;
-    font-size: 14px;
+    padding: 6px 12px;
+    font-size: 12px;
     border: none;
     border-radius: 4px;
     cursor: pointer;
     transition: all 0.3s;
-    align-self: flex-start;
+    white-space: nowrap;
   }
   
   .next-btn:hover {
@@ -149,10 +226,88 @@
   }
   
   .unannotated-count {
-    font-size: 14px;
+    font-size: 12px;
     color: #666;
     font-weight: bold;
-    margin-top: 5px;
+    white-space: nowrap;
+  }
+  
+  
+  
+  .speed-radio-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    justify-content: center;
+  }
+  
+  .speed-radio {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    border: 1px solid #ddd;
+    background: white;
+    transition: all 0.2s;
+  }
+  
+  .speed-radio:hover {
+    background: #f0f0f0;
+  }
+  
+  .speed-radio input[type="radio"] {
+    display: none;
+  }
+  
+  .speed-radio input[type="radio"]:checked + span {
+    font-weight: bold;
+  }
+  
+  .speed-radio:has(input[type="radio"]:checked) {
+    background: #4CAF50;
+    color: white;
+    border-color: #45a049;
+  }
+  
+  .annotation-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+  
+  .progress-bar {
+    width: 100%;
+    height: 6px;
+    background: #ddd;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 10px;
+  }
+  
+  .progress-fill {
+    height: 100%;
+    background: #4CAF50;
+    width: 0%;
+    transition: width 0.1s linear;
+    pointer-events: none;
+  }
+  
+  .speed-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 15px;
+    width: 100%;
+  }
+  
+  .speed-label {
+    font-size: 12px;
+    color: #666;
+    font-weight: bold;
+    text-align: center;
   }
   
   .midi-info {
@@ -228,6 +383,11 @@
     position: relative;
     height: 100%;
     min-width: 800px;
+    cursor: pointer;
+  }
+  
+  .notes-area:hover {
+    background: rgba(76, 175, 80, 0.02);
   }
   
   :global(.note) {
@@ -247,6 +407,11 @@
     background: white;
     border-bottom: 1px solid #ccc;
     z-index: 5;
+    cursor: pointer;
+  }
+  
+  .timeline:hover {
+    background: #f8f8f8;
   }
   
   :global(.time-marker) {
@@ -272,22 +437,6 @@
   :global(.structure-b) { background-color: #99ccff; border-color: #0066cc; }
   :global(.structure-c) { background-color: #99ff99; border-color: #00cc00; }
   
-  .controls {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-    margin: 20px 0;
-    padding: 20px;
-    background: #f9f9f9;
-    border-radius: 5px;
-  }
-  
-  .control-group {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-  }
   
   button {
     padding: 12px 24px;
@@ -334,22 +483,6 @@
     background: #d32f2f;
   }
   
-  .progress-bar {
-    width: 100%;
-    height: 6px;
-    background: #ddd;
-    border-radius: 3px;
-    overflow: hidden;
-    margin: 10px 0;
-  }
-  
-  .progress-fill {
-    height: 100%;
-    background: #4CAF50;
-    width: 0%;
-    transition: width 0.1s linear;
-    pointer-events: none;
-  }
   
   .legend {
     display: flex;
@@ -417,14 +550,17 @@
   .volume-control {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-top: 10px;
+    gap: 8px;
+  }
+  
+  .volume-label {
+    font-size: 14px;
   }
   
   .volume-slider {
-    width: 100px;
-    height: 6px;
-    border-radius: 3px;
+    width: 80px;
+    height: 4px;
+    border-radius: 2px;
     background: #ddd;
     outline: none;
     -webkit-appearance: none;
@@ -433,55 +569,27 @@
   .volume-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    width: 18px;
-    height: 18px;
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
     background: #4CAF50;
     cursor: pointer;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
   }
   
   .volume-slider::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
     background: #4CAF50;
     cursor: pointer;
     border: none;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
   }
   
-  .volume-label {
+  .volume-value {
     font-size: 12px;
     color: #666;
-    min-width: 60px;
-  }
-
-  .speed-control {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-top: 10px;
-  }
-
-  .speed-label {
-    font-size: 12px;
-    color: #666;
-    min-width: 60px;
-  }
-
-  .speed-selector {
-    padding: 4px 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 12px;
-    background: white;
-    cursor: pointer;
-    outline: none;
-  }
-
-  .speed-selector:focus {
-    border-color: #4CAF50;
-    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+    min-width: 30px;
   }
 </style>

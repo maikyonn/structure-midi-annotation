@@ -12,8 +12,8 @@ class MidiAnnotationTool {
         this.playbackInterval = null;
         this.piano = null;
         this.scheduledNotes = [];
-        this.masterVolume = 7.0; // Default volume (70% * 10x boost = 700%)
-        this.playbackSpeed = 1.0; // Default playback speed (1x)
+        this.masterVolume = 10.0; // Default volume (100% * 10x boost = 1000%)
+        this.playbackSpeed = 2.0; // Default playback speed (2x)
         
         this.init();
     }
@@ -39,6 +39,9 @@ class MidiAnnotationTool {
             }, 100);
             
             this.showStatus(`Loaded ${this.midiFiles.length} MIDI files`, 'success');
+            
+            // Auto-load a random MIDI file
+            this.loadRandomMidiFile();
         } catch (error) {
             console.error('Error loading MIDI files:', error);
             this.showStatus('Error loading MIDI files from database', 'error');
@@ -49,6 +52,12 @@ class MidiAnnotationTool {
     setupEventListeners() {
         document.getElementById('midiSelect').addEventListener('change', (e) => {
             if (e.target.value) {
+                // Pause any current playback
+                if (this.isPlaying) {
+                    this.stopPlayback();
+                    document.getElementById('playBtn').textContent = '▶ Play';
+                }
+                
                 this.currentFileIndex = parseInt(e.target.value);
                 this.loadMidiFile();
             }
@@ -76,9 +85,13 @@ class MidiAnnotationTool {
             this.loadNextUnannotated();
         });
         
-        // Speed selector
-        document.getElementById('speedSelect').addEventListener('change', (e) => {
-            this.updateSpeed(parseFloat(e.target.value));
+        // Speed radio buttons
+        document.querySelectorAll('input[name="speed"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    this.updateSpeed(parseFloat(e.target.value));
+                }
+            });
         });
     }
     
@@ -197,13 +210,20 @@ class MidiAnnotationTool {
     renderPianoRoll() {
         if (!this.currentMidiData) return;
         
-        const notesArea = document.getElementById('notesArea');
-        const timeline = document.getElementById('timeline');
+        let notesArea = document.getElementById('notesArea');
+        let timeline = document.getElementById('timeline');
         const pianoRoll = document.getElementById('pianoRoll');
         
         // Clear existing content
         notesArea.innerHTML = '';
         timeline.innerHTML = '';
+        
+        // Remove existing event listeners by replacing the elements
+        timeline.replaceWith(timeline.cloneNode(true));
+        timeline = document.getElementById('timeline');
+        
+        notesArea.replaceWith(notesArea.cloneNode(true));
+        notesArea = document.getElementById('notesArea');
         
         // Calculate available width (subtract piano keys width)
         const availableWidth = pianoRoll.clientWidth - 60; // 60px for piano keys
@@ -213,6 +233,16 @@ class MidiAnnotationTool {
         
         // Store for use in highlighting
         this.pixelsPerSecond = pixelsPerSecond;
+        
+        // Add click event listener to timeline for scrubbing
+        timeline.addEventListener('click', (event) => {
+            this.scrubToTimelinePosition(event);
+        });
+        
+        // Add click event listener to notes area (piano roll) for scrubbing
+        notesArea.addEventListener('click', (event) => {
+            this.scrubToPianoRollPosition(event);
+        });
         
         // Add time markers
         const markerInterval = this.totalDuration > 120 ? 30 : (this.totalDuration > 60 ? 10 : 5);
@@ -364,7 +394,7 @@ class MidiAnnotationTool {
         this.masterVolume = (value / 100) * 10; // Convert percentage to 0-10 (10x boost)
         
         // Update volume display
-        document.getElementById('volumeValue').textContent = `${value}% (10x boost)`;
+        document.getElementById('volumeValue').textContent = `${value}%`;
         
         // Update actual audio volume
         if (this.masterGain) {
@@ -384,17 +414,16 @@ class MidiAnnotationTool {
         this.playbackSpeed = multiplier;
         console.log(`Playback speed updated to ${multiplier}x`);
         
-        // If currently playing, restart playback with new speed
+        // If currently playing, restart playback from the beginning
         if (this.isPlaying) {
-            const currentPosition = this.playbackPosition;
             this.stopCurrentPlayback();
-            this.startPlaybackFromPosition(currentPosition);
+            this.playbackPosition = 0;
+            this.startPlaybackFromPosition(0);
         }
     }
     
     updatePlaybackCursor() {
         const cursorDiv = document.getElementById('playbackCursor');
-        const notesArea = document.getElementById('notesArea');
         
         if (!cursorDiv || !this.pixelsPerSecond) return;
         
@@ -414,6 +443,56 @@ class MidiAnnotationTool {
         const newPosition = progressPercent * this.totalDuration;
         
         console.log(`Scrubbing to ${newPosition.toFixed(2)}s (${(progressPercent * 100).toFixed(1)}%)`);
+        
+        // Update playback position
+        this.playbackPosition = Math.max(0, Math.min(newPosition, this.totalDuration));
+        
+        // Update visual elements
+        this.updateProgressBar();
+        this.updatePlaybackCursor();
+        
+        // If currently playing, restart playback from new position
+        if (this.isPlaying) {
+            this.restartPlaybackFromPosition();
+        }
+    }
+    
+    scrubToTimelinePosition(event) {
+        if (!this.totalDuration || !this.pixelsPerSecond) return;
+        
+        const timeline = event.currentTarget;
+        const rect = timeline.getBoundingClientRect();
+        const clickX = event.clientX - rect.left;
+        
+        // Convert pixel position to time
+        const newPosition = clickX / this.pixelsPerSecond;
+        
+        console.log(`Timeline clicked: ${clickX}px -> ${newPosition.toFixed(2)}s`);
+        
+        // Update playback position
+        this.playbackPosition = Math.max(0, Math.min(newPosition, this.totalDuration));
+        
+        // Update visual elements
+        this.updateProgressBar();
+        this.updatePlaybackCursor();
+        
+        // If currently playing, restart playback from new position
+        if (this.isPlaying) {
+            this.restartPlaybackFromPosition();
+        }
+    }
+    
+    scrubToPianoRollPosition(event) {
+        if (!this.totalDuration || !this.pixelsPerSecond) return;
+        
+        const notesArea = event.currentTarget;
+        const rect = notesArea.getBoundingClientRect();
+        const clickX = event.clientX - rect.left;
+        
+        // Convert pixel position to time
+        const newPosition = clickX / this.pixelsPerSecond;
+        
+        console.log(`Piano roll clicked: ${clickX}px -> ${newPosition.toFixed(2)}s`);
         
         // Update playback position
         this.playbackPosition = Math.max(0, Math.min(newPosition, this.totalDuration));
@@ -896,7 +975,28 @@ class MidiAnnotationTool {
     }
     
     
+    loadRandomMidiFile() {
+        if (this.midiFiles.length === 0) return;
+        
+        // Select a random file
+        const randomIndex = Math.floor(Math.random() * this.midiFiles.length);
+        this.currentFileIndex = randomIndex;
+        
+        // Update the selector
+        const select = document.getElementById('midiSelect');
+        select.value = randomIndex;
+        
+        // Load the file
+        this.loadMidiFile();
+    }
+    
     moveToNextFile() {
+        // Pause any current playback
+        if (this.isPlaying) {
+            this.stopPlayback();
+            document.getElementById('playBtn').textContent = '▶ Play';
+        }
+        
         const select = document.getElementById('midiSelect');
         const nextIndex = this.currentFileIndex + 1;
         
@@ -911,6 +1011,12 @@ class MidiAnnotationTool {
     
     async loadNextUnannotated() {
         try {
+            // Pause any current playback
+            if (this.isPlaying) {
+                this.stopPlayback();
+                document.getElementById('playBtn').textContent = '▶ Play';
+            }
+            
             // Get next unannotated file from Supabase
             const currentFileId = this.currentFileData ? this.currentFileData.file_id : null;
             const nextFile = await MidiDataService.getNextUnannotated(currentFileId);
