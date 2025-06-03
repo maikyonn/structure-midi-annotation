@@ -72,6 +72,16 @@
         <input type="range" class="volume-slider" id="volumeSlider" min="0" max="100" value="70">
         <span class="volume-label" id="volumeValue">70% (10x boost)</span>
       </div>
+      <div class="speed-control">
+        <span class="speed-label">⚡ Speed:</span>
+        <select id="speedSelect" class="speed-selector">
+          <option value="1">1x</option>
+          <option value="2">2x</option>
+          <option value="3">3x</option>
+          <option value="5">5x</option>
+          <option value="8">8x</option>
+        </select>
+      </div>
       <small style="color: #666; text-align: center;">Click play to initialize audio</small>
     </div>
     <div class="control-group">
@@ -385,6 +395,12 @@
     border: 1px solid #f5c6cb;
   }
   
+  :global(.status.info) {
+    background: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+  }
+  
   select, input {
     padding: 8px;
     border: 1px solid #ddd;
@@ -439,5 +455,33 @@
     font-size: 12px;
     color: #666;
     min-width: 60px;
+  }
+
+  .speed-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .speed-label {
+    font-size: 12px;
+    color: #666;
+    min-width: 60px;
+  }
+
+  .speed-selector {
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 12px;
+    background: white;
+    cursor: pointer;
+    outline: none;
+  }
+
+  .speed-selector:focus {
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
   }
 </style>

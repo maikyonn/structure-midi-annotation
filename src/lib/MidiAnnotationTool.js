@@ -1,7 +1,10 @@
+import { MidiDataService } from './supabaseClient.js';
+
 class MidiAnnotationTool {
     constructor() {
-        this.csvData = [];
+        this.midiFiles = [];
         this.currentFileIndex = 0;
+        this.currentFileData = null;
         this.currentMidiData = null;
         this.isPlaying = false;
         this.playbackPosition = 0;
@@ -10,63 +13,38 @@ class MidiAnnotationTool {
         this.piano = null;
         this.scheduledNotes = [];
         this.masterVolume = 7.0; // Default volume (70% * 10x boost = 700%)
+        this.playbackSpeed = 1.0; // Default playback speed (1x)
         
         this.init();
     }
     
     async init() {
-        await this.loadCSVData();
+        await this.loadMidiFilesData();
         this.setupEventListeners();
         this.populateFileSelector();
         this.createPianoKeys();
         // Audio will be initialized on first play button click
     }
     
-    async loadCSVData() {
+    async loadMidiFilesData() {
         try {
-            const response = await fetch('included_files.csv');
-            const csvText = await response.text();
-            const lines = csvText.split('\n');
-            const headers = lines[0].split(',');
+            this.showStatus('Loading MIDI files from database...', 'info');
             
-            this.csvData = lines.slice(1).filter(line => line.trim()).map(line => {
-                const values = this.parseCSVLine(line);
-                const row = {};
-                headers.forEach((header, index) => {
-                    row[header.trim()] = values[index] ? values[index].trim() : '';
-                });
-                return row;
-            });
+            this.midiFiles = await MidiDataService.loadMidiFiles();
+            console.log('Loaded MIDI files:', this.midiFiles.length);
             
             // Update button state and count after loading data
             setTimeout(() => {
                 this.updateNextButton();
             }, 100);
+            
+            this.showStatus(`Loaded ${this.midiFiles.length} MIDI files`, 'success');
         } catch (error) {
-            console.error('Error loading CSV:', error);
-            this.showStatus('Error loading CSV data', 'error');
+            console.error('Error loading MIDI files:', error);
+            this.showStatus('Error loading MIDI files from database', 'error');
         }
     }
     
-    parseCSVLine(line) {
-        const result = [];
-        let current = '';
-        let inQuotes = false;
-        
-        for (let i = 0; i < line.length; i++) {
-            const char = line[i];
-            if (char === '"') {
-                inQuotes = !inQuotes;
-            } else if (char === ',' && !inQuotes) {
-                result.push(current);
-                current = '';
-            } else {
-                current += char;
-            }
-        }
-        result.push(current);
-        return result;
-    }
     
     setupEventListeners() {
         document.getElementById('midiSelect').addEventListener('change', (e) => {
@@ -97,30 +75,59 @@ class MidiAnnotationTool {
         document.getElementById('nextUnannotatedBtn').addEventListener('click', () => {
             this.loadNextUnannotated();
         });
+        
+        // Speed selector
+        document.getElementById('speedSelect').addEventListener('change', (e) => {
+            this.updateSpeed(parseFloat(e.target.value));
+        });
     }
     
     populateFileSelector() {
         const select = document.getElementById('midiSelect');
         select.innerHTML = '<option value="">Select a MIDI file...</option>';
         
-        this.csvData.forEach((row, index) => {
+        this.midiFiles.forEach((file, index) => {
             const option = document.createElement('option');
             option.value = index;
-            option.textContent = row.file_id;
+            option.textContent = file.file_id;
+            
+            // Add visual indicator for annotated files
+            if (file.human_agree !== null) {
+                option.textContent += file.human_agree ? ' ✓' : ' ✗';
+            }
+            
             select.appendChild(option);
         });
     }
     
     async loadMidiFile() {
-        const fileData = this.csvData[this.currentFileIndex];
+        const fileData = this.midiFiles[this.currentFileIndex];
         if (!fileData) return;
         
+        this.currentFileData = fileData;
+        
         try {
-            // Load MIDI file
-            const midiPath = `midi/${fileData.file_id}`;
-            const response = await fetch(midiPath);
+            // Load MIDI file from AWS S3
+            const midiPath = `https://ml-datasets-maikyon.s3.us-west-2.amazonaws.com/midi/${fileData.file_id}`;
             
-            if (!response.ok) {
+            // Try with CORS mode first
+            let response;
+            try {
+                response = await fetch(midiPath, {
+                    mode: 'cors',
+                    headers: {
+                        'Origin': window.location.origin
+                    }
+                });
+            } catch (corsError) {
+                console.warn('CORS fetch failed, trying no-cors mode:', corsError);
+                // Fallback to no-cors mode for MIDI data
+                response = await fetch(midiPath, {
+                    mode: 'no-cors'
+                });
+            }
+            
+            if (!response.ok && response.status !== 0) {
                 throw new Error(`MIDI file not found: ${midiPath}`);
             }
             
@@ -389,6 +396,18 @@ class MidiAnnotationTool {
         console.log(`Volume updated to ${value}% (${this.masterVolume})`);
     }
     
+    updateSpeed(multiplier) {
+        this.playbackSpeed = multiplier;
+        console.log(`Playback speed updated to ${multiplier}x`);
+        
+        // If currently playing, restart playback with new speed
+        if (this.isPlaying) {
+            const currentPosition = this.playbackPosition;
+            this.stopCurrentPlayback();
+            this.startPlaybackFromPosition(currentPosition);
+        }
+    }
+    
     updatePlaybackCursor() {
         const cursorDiv = document.getElementById('playbackCursor');
         const notesArea = document.getElementById('notesArea');
@@ -473,12 +492,13 @@ class MidiAnnotationTool {
         
         const startTime = Date.now() - (startPosition * 1000); // Adjust for current position
         
-        // Schedule remaining notes for playback
+        // Schedule remaining notes for playback (adjusted for speed)
         allNotes.forEach(note => {
             const playTime = note.time * 1000; // Convert to milliseconds
             const adjustedPlayTime = playTime - (startPosition * 1000); // Adjust for scrub position
+            const speedAdjustedTime = adjustedPlayTime / this.playbackSpeed; // Apply speed multiplier
             
-            if (adjustedPlayTime >= 0) { // Only schedule future notes
+            if (speedAdjustedTime >= 0) { // Only schedule future notes
                 const timeoutId = setTimeout(() => {
                     if (this.isPlaying && this.piano) {
                         try {
@@ -487,12 +507,14 @@ class MidiAnnotationTool {
                                 const noteName = Tone.Frequency(note.midi, "midi").toNote();
                                 // Apply 10x volume boost to individual notes too
                                 const boostedVelocity = Math.min((note.velocity / 127) * 10, 1); // Cap at 1.0
-                                this.piano.triggerAttackRelease(noteName, note.duration, undefined, boostedVelocity);
+                                // Adjust note duration for speed
+                                const speedAdjustedDuration = note.duration / this.playbackSpeed;
+                                this.piano.triggerAttackRelease(noteName, speedAdjustedDuration, undefined, boostedVelocity);
                             } else if (this.piano.playNote) {
                                 // Custom synthesizer fallback
                                 this.piano.playNote(
                                     note.midi, 
-                                    note.duration, 
+                                    note.duration / this.playbackSpeed, // Adjust duration for speed
                                     note.velocity / 127,
                                     0 // Start immediately when timeout fires
                                 );
@@ -501,17 +523,18 @@ class MidiAnnotationTool {
                             console.error('Error playing note:', error);
                         }
                     }
-                }, adjustedPlayTime);
+                }, speedAdjustedTime);
                 
                 this.scheduledNotes.push(timeoutId);
             }
         });
         
-        // Update progress bar and cursor
+        // Update progress bar and cursor (adjusted for speed)
         this.playbackInterval = setInterval(() => {
             if (!this.isPlaying) return;
             
-            this.playbackPosition = (Date.now() - startTime) / 1000;
+            // Calculate position with speed multiplier
+            this.playbackPosition = ((Date.now() - startTime) / 1000) * this.playbackSpeed;
             this.updateProgressBar();
             this.updatePlaybackCursor();
             
@@ -771,9 +794,10 @@ class MidiAnnotationTool {
         
         const startTime = Date.now();
         
-        // Schedule notes for playback
+        // Schedule notes for playback (adjusted for speed)
         allNotes.forEach(note => {
             const playTime = note.time * 1000; // Convert to milliseconds
+            const speedAdjustedTime = playTime / this.playbackSpeed; // Apply speed multiplier
             
             const timeoutId = setTimeout(() => {
                 if (this.isPlaying && this.piano) {
@@ -783,12 +807,14 @@ class MidiAnnotationTool {
                             const noteName = Tone.Frequency(note.midi, "midi").toNote();
                             // Apply 10x volume boost to individual notes too
                             const boostedVelocity = Math.min((note.velocity / 127) * 10, 1); // Cap at 1.0
-                            this.piano.triggerAttackRelease(noteName, note.duration, undefined, boostedVelocity);
+                            // Adjust note duration for speed
+                            const speedAdjustedDuration = note.duration / this.playbackSpeed;
+                            this.piano.triggerAttackRelease(noteName, speedAdjustedDuration, undefined, boostedVelocity);
                         } else if (this.piano.playNote) {
                             // Custom synthesizer fallback
                             this.piano.playNote(
                                 note.midi, 
-                                note.duration, 
+                                note.duration / this.playbackSpeed, // Adjust duration for speed
                                 note.velocity / 127,
                                 0 // Start immediately when timeout fires
                             );
@@ -797,7 +823,7 @@ class MidiAnnotationTool {
                         console.error('Error playing note:', error);
                     }
                 }
-            }, playTime);
+            }, speedAdjustedTime);
             
             this.scheduledNotes.push(timeoutId);
         });
@@ -808,11 +834,12 @@ class MidiAnnotationTool {
             playbackCursor.style.display = 'block';
         }
         
-        // Update progress bar and cursor
+        // Update progress bar and cursor (adjusted for speed)
         this.playbackInterval = setInterval(() => {
             if (!this.isPlaying) return;
             
-            this.playbackPosition = (Date.now() - startTime) / 1000;
+            // Calculate position with speed multiplier
+            this.playbackPosition = ((Date.now() - startTime) / 1000) * this.playbackSpeed;
             const progress = Math.min((this.playbackPosition / this.totalDuration) * 100, 100);
             document.getElementById('progressFill').style.width = `${progress}%`;
             
@@ -850,19 +877,28 @@ class MidiAnnotationTool {
     }
     
     async submitAnnotation(agrees) {
-        const fileData = this.csvData[this.currentFileIndex];
+        const fileData = this.currentFileData;
+        if (!fileData) return;
         
         try {
-            // Add human_agree column to CSV data
-            fileData.human_agree = agrees ? 'true' : 'false';
+            this.showStatus('Saving annotation...', 'info');
             
-            // Update CSV
-            await this.updateCSV();
+            // Save annotation to Supabase
+            await MidiDataService.saveAnnotation(fileData.file_id, agrees);
+            
+            // Update local data
+            fileData.human_agree = agrees;
+            this.midiFiles[this.currentFileIndex].human_agree = agrees;
             
             this.showStatus(`Annotation saved: ${agrees ? 'Agreed' : 'Disagreed'}`, 'success');
             
             // Update the count and button state
             this.updateNextButton();
+            
+            // Update file selector to show annotation status
+            this.populateFileSelector();
+            // Re-select current file
+            document.getElementById('midiSelect').value = this.currentFileIndex;
             
             // Move to next file
             setTimeout(() => {
@@ -871,43 +907,16 @@ class MidiAnnotationTool {
             
         } catch (error) {
             console.error('Error saving annotation:', error);
-            this.showStatus('Error saving annotation', 'error');
+            this.showStatus('Error saving annotation to database', 'error');
         }
     }
     
-    async updateCSV() {
-        const fileData = this.csvData[this.currentFileIndex];
-        
-        try {
-            const response = await fetch('/update-annotation', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    fileId: fileData.file_id,
-                    humanAgree: fileData.human_agree === 'true'
-                })
-            });
-            
-            if (!response.ok) {
-                throw new Error('Failed to update CSV');
-            }
-            
-            const result = await response.json();
-            console.log('CSV updated successfully:', result);
-            
-        } catch (error) {
-            console.error('Error updating CSV:', error);
-            throw error;
-        }
-    }
     
     moveToNextFile() {
         const select = document.getElementById('midiSelect');
         const nextIndex = this.currentFileIndex + 1;
         
-        if (nextIndex < this.csvData.length) {
+        if (nextIndex < this.midiFiles.length) {
             select.value = nextIndex;
             this.currentFileIndex = nextIndex;
             this.loadMidiFile();
@@ -916,67 +925,77 @@ class MidiAnnotationTool {
         }
     }
     
-    loadNextUnannotated() {
-        // Find the next file that doesn't have human_agree set
-        const startIndex = this.currentFileIndex + 1;
-        
-        for (let i = startIndex; i < this.csvData.length; i++) {
-            const fileData = this.csvData[i];
-            if (!fileData.human_agree || fileData.human_agree.trim() === '') {
-                // Found an unannotated file
-                this.currentFileIndex = i;
-                const select = document.getElementById('midiSelect');
-                select.value = i;
-                this.loadMidiFile();
+    async loadNextUnannotated() {
+        try {
+            // Get next unannotated file from Supabase
+            const currentFileId = this.currentFileData ? this.currentFileData.file_id : null;
+            const nextFile = await MidiDataService.getNextUnannotated(currentFileId);
+            
+            if (nextFile) {
+                // Find the index of this file in our local array
+                const fileIndex = this.midiFiles.findIndex(file => file.file_id === nextFile.file_id);
+                
+                if (fileIndex !== -1) {
+                    this.currentFileIndex = fileIndex;
+                    const select = document.getElementById('midiSelect');
+                    select.value = fileIndex;
+                    this.loadMidiFile();
+                    this.updateNextButton();
+                } else {
+                    // File not found in local array, reload data
+                    await this.loadMidiFilesData();
+                    this.populateFileSelector();
+                    this.loadNextUnannotated(); // Try again
+                }
+            } else {
+                // No unannotated files found
+                this.showStatus('All files have been annotated!', 'success');
                 this.updateNextButton();
-                return;
             }
+        } catch (error) {
+            console.error('Error loading next unannotated file:', error);
+            this.showStatus('Error loading next unannotated file', 'error');
         }
-        
-        // If no unannotated files found after current position, check from beginning
-        for (let i = 0; i < startIndex; i++) {
-            const fileData = this.csvData[i];
-            if (!fileData.human_agree || fileData.human_agree.trim() === '') {
-                // Found an unannotated file
-                this.currentFileIndex = i;
-                const select = document.getElementById('midiSelect');
-                select.value = i;
-                this.loadMidiFile();
-                this.updateNextButton();
-                return;
-            }
-        }
-        
-        // No unannotated files found
-        this.showStatus('All files have been annotated!', 'success');
-        this.updateNextButton();
     }
     
-    updateNextButton() {
+    async updateNextButton() {
         const button = document.getElementById('nextUnannotatedBtn');
-        const hasUnannotated = this.csvData.some(file => 
-            !file.human_agree || file.human_agree.trim() === ''
-        );
         
-        if (hasUnannotated) {
-            button.disabled = false;
-            button.textContent = 'Next Unannotated';
-        } else {
-            button.disabled = true;
-            button.textContent = 'All Annotated';
+        try {
+            const unannotatedCount = await MidiDataService.getUnannotatedCount();
+            
+            if (unannotatedCount > 0) {
+                button.disabled = false;
+                button.textContent = 'Next Unannotated';
+            } else {
+                button.disabled = true;
+                button.textContent = 'All Annotated';
+            }
+            
+            // Update the count display
+            await this.updateUnannotatedCount();
+        } catch (error) {
+            console.error('Error updating next button:', error);
+            // Fallback to local check
+            const hasUnannotated = this.midiFiles.some(file => file.human_agree === null);
+            button.disabled = !hasUnannotated;
+            button.textContent = hasUnannotated ? 'Next Unannotated' : 'All Annotated';
+            this.updateUnannotatedCount();
         }
-        
-        // Update the count display
-        this.updateUnannotatedCount();
     }
     
-    updateUnannotatedCount() {
+    async updateUnannotatedCount() {
         const countElement = document.getElementById('unannotatedCount');
-        const unannotatedCount = this.csvData.filter(file => 
-            !file.human_agree || file.human_agree.trim() === ''
-        ).length;
         
-        countElement.textContent = `Unannotated files: ${unannotatedCount}`;
+        try {
+            const unannotatedCount = await MidiDataService.getUnannotatedCount();
+            countElement.textContent = `Unannotated files: ${unannotatedCount}`;
+        } catch (error) {
+            console.error('Error getting unannotated count:', error);
+            // Fallback to local count
+            const localCount = this.midiFiles.filter(file => file.human_agree === null).length;
+            countElement.textContent = `Unannotated files: ${localCount}`;
+        }
     }
     
     showStatus(message, type) {
