@@ -109,25 +109,9 @@ class MidiAnnotationTool {
         try {
             // Load MIDI file from AWS S3
             const midiPath = `https://ml-datasets-maikyon.s3.us-west-2.amazonaws.com/midi/${fileData.file_id}`;
+            const response = await fetch(midiPath);
             
-            // Try with CORS mode first
-            let response;
-            try {
-                response = await fetch(midiPath, {
-                    mode: 'cors',
-                    headers: {
-                        'Origin': window.location.origin
-                    }
-                });
-            } catch (corsError) {
-                console.warn('CORS fetch failed, trying no-cors mode:', corsError);
-                // Fallback to no-cors mode for MIDI data
-                response = await fetch(midiPath, {
-                    mode: 'no-cors'
-                });
-            }
-            
-            if (!response.ok && response.status !== 0) {
+            if (!response.ok) {
                 throw new Error(`MIDI file not found: ${midiPath}`);
             }
             
