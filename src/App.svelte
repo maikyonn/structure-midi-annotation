@@ -285,6 +285,7 @@
     border-radius: 3px;
     overflow: hidden;
     margin-top: 10px;
+    cursor: pointer;
   }
   
   .progress-fill {

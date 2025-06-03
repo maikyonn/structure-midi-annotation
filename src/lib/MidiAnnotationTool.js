@@ -93,6 +93,14 @@ class MidiAnnotationTool {
                 }
             });
         });
+        
+        // Progress bar click for scrubbing
+        const progressBar = document.querySelector('.progress-bar');
+        if (progressBar) {
+            progressBar.addEventListener('click', (e) => {
+                this.scrubToPosition(e);
+            });
+        }
     }
     
     populateFileSelector() {
@@ -553,7 +561,7 @@ class MidiAnnotationTool {
         // Sort notes by time
         allNotes.sort((a, b) => a.time - b.time);
         
-        const startTime = Date.now() - (startPosition * 1000); // Adjust for current position
+        const startTime = Date.now();
         
         // Schedule remaining notes for playback (adjusted for speed)
         allNotes.forEach(note => {
@@ -592,12 +600,13 @@ class MidiAnnotationTool {
             }
         });
         
-        // Update progress bar and cursor (adjusted for speed)
+        // Update progress bar and cursor
         this.playbackInterval = setInterval(() => {
             if (!this.isPlaying) return;
             
-            // Calculate position with speed multiplier
-            this.playbackPosition = ((Date.now() - startTime) / 1000) * this.playbackSpeed;
+            // Calculate actual position in song
+            const elapsedRealTime = (Date.now() - startTime) / 1000;
+            this.playbackPosition = startPosition + (elapsedRealTime * this.playbackSpeed);
             this.updateProgressBar();
             this.updatePlaybackCursor();
             
@@ -897,12 +906,13 @@ class MidiAnnotationTool {
             playbackCursor.style.display = 'block';
         }
         
-        // Update progress bar and cursor (adjusted for speed)
+        // Update progress bar and cursor
         this.playbackInterval = setInterval(() => {
             if (!this.isPlaying) return;
             
-            // Calculate position with speed multiplier
-            this.playbackPosition = ((Date.now() - startTime) / 1000) * this.playbackSpeed;
+            // Calculate actual position in song
+            const elapsedRealTime = (Date.now() - startTime) / 1000;
+            this.playbackPosition = elapsedRealTime * this.playbackSpeed;
             const progress = Math.min((this.playbackPosition / this.totalDuration) * 100, 100);
             document.getElementById('progressFill').style.width = `${progress}%`;
             
